@@ -1,13 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
+    <link rel="stylesheet" href="style.css">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Whiteboard App</title>
 </head>
+
 <body>
-    <canvas id="canvas"></canvas>
+    <div class="canvas_container">
+        <canvas id="canvas"></canvas>
+    </div>
+    <div class="tools">
+        <button id="pencil"><img src="assets/icons/pencil.png" alt="pencil"></button>
+        <button id="line"><img src="assets/icons/line.png" alt="line"></button>
+        <button id="rectangle"><img src="assets/icons/rectangle.png" alt="rectangle"></button>
+        <button id="eraser"><img src="assets/icons/eraser.png" alt="eraser"></button>
+        <button id="colorPallate"><img src="assets/icons/color pallate.png" alt="colorPallate"></button>
+    </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
     <script src="script.js"></script>
 </body>
+
 </html>
