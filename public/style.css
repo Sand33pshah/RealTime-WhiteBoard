@@ -24,7 +24,7 @@ body {
     justify-content: space-around;
     align-items: center;
     max-height: 10%;
-    width: 12%;
+    width: 15%;
 }
 
 .canvas_container {
@@ -48,6 +48,12 @@ button{
     cursor: pointer;
     background: transparent;
     border: none;
+}
+
+.tools input{
+    background:none;
+    border:none;
+    cursor: pointer;
 }
 
 canvas {

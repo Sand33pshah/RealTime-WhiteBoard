@@ -12,6 +12,8 @@ let startX, startY;
 let currentTool = 'pencil'; // default tool
 const eraserSize = 20; // size of eraser
 let storedDrawings = []; // to store all actions
+let currentColor = '#000000'; // Default color
+
 
 // Retrieve the tool selected
 const toolButtons = document.querySelectorAll('.tools button');
@@ -28,6 +30,12 @@ toolButtons.forEach(button => {
     });
 });
 
+const colorPicker = document.getElementById('colorPicker');
+colorPicker.addEventListener('input', (e) => {
+    currentColor = e.target.value;
+});
+
+
 window.onmousedown = (e) => {
     const rect = canvas.getBoundingClientRect();
     x = e.clientX - rect.left;
@@ -38,14 +46,14 @@ window.onmousedown = (e) => {
     if (currentTool === 'pencil') {
         ctx.beginPath();
         ctx.moveTo(x, y);
-        io.emit('down', { x, y });
+        io.emit('down', { x, y, color: currentColor });
     } else if (currentTool === 'eraser') {
         ctx.beginPath();
         ctx.arc(x, y, eraserSize, 0, Math.PI * 2); // Draw initial circle
         ctx.fill();
         io.emit('down', { x, y, size: eraserSize });
     } else if (currentTool === 'line' || currentTool === 'rectangle') {
-        io.emit('down', { x: startX, y: startY });
+        io.emit('down', { x: startX, y: startY, color: currentColor });
     }
 
     mouseDown = true;
@@ -59,16 +67,17 @@ window.onmouseup = (e) => {
     y = e.clientY - rect.top;
 
     if (currentTool === 'line') {
+        ctx.strokeStyle = currentColor; //set color
         ctx.beginPath();
         ctx.moveTo(startX, startY);
         ctx.lineTo(x, y);
         ctx.stroke();
-        io.emit('drawLine', { startX, startY, endX: x, endY: y });
+        io.emit('drawLine', { startX, startY, endX: x, endY: y, color: currentColor });
     } else if (currentTool === 'rectangle') {
         ctx.beginPath();
         ctx.rect(startX, startY, x - startX, y - startY);
         ctx.stroke();
-        io.emit('drawRect', { startX, startY, width: x - startX, height: y - startY });
+        io.emit('drawRect', { startX, startY, width: x - startX, height: y - startY, color: currentColor });
     }
 
     mouseDown = false;
@@ -84,7 +93,7 @@ window.onmousemove = (e) => {
     if (currentTool === 'pencil') {
         ctx.lineTo(x, y);
         ctx.stroke();
-        io.emit('draw', { startX, startY, endX: x, endY: y });
+        io.emit('draw', { startX, startY, endX: x, endY: y, color: currentColor });
         startX = x;
         startY = y;
     } else if (currentTool === 'eraser') {
@@ -127,6 +136,9 @@ io.on('ondown', (data) => {
 });
 
 function drawAction(action) {
+    ctx.strokeStyle = action.color || '#000000'; // Use the action's color or default to black
+    ctx.fillStyle = action.color || '#000000';   // Use the action's color or default to black
+
     if (action.tool === 'pencil') {
         ctx.beginPath();
         ctx.moveTo(action.startX, action.startY);

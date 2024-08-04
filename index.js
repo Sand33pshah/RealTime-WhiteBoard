@@ -14,7 +14,7 @@ io.on('connect', (socket) => {
     socket.emit('initDrawing', drawingActions);
 
     socket.on('draw', (data) => {
-        let action = { tool: 'pencil', startX: data.startX, startY: data.startY, endX: data.endX, endY: data.endY };
+        let action = { tool: 'pencil', startX: data.startX, startY: data.startY, endX: data.endX, endY: data.endY};
         drawingActions.push(action);
         connections.forEach(con => {
             if (con.id !== socket.id) {
@@ -34,7 +34,7 @@ io.on('connect', (socket) => {
     });
 
     socket.on('drawLine', (data) => {
-        let action = { tool: 'line', startX: data.startX, startY: data.startY, endX: data.endX, endY: data.endY };
+        let action = { tool: 'line', startX: data.startX, startY: data.startY, endX: data.endX, endY: data.endY};
         drawingActions.push(action);
         connections.forEach(con => {
             if (con.id !== socket.id) {
@@ -44,7 +44,7 @@ io.on('connect', (socket) => {
     });
 
     socket.on('drawRect', (data) => {
-        let action = { tool: 'rectangle', startX: data.startX, startY: data.startY, width: data.width, height: data.height };
+        let action = { tool: 'rectangle', startX: data.startX, startY: data.startY, width: data.width, height: data.height};
         drawingActions.push(action);
         connections.forEach(con => {
             if (con.id !== socket.id) {
