@@ -17,6 +17,31 @@ io.on('connect', (socket) => {
         });
     });
 
+    socket.on('erase', (data) => {
+        console.log('Broadcasting erase event:', data);
+        connections.forEach(con => {
+            if(con.id !== socket.id){
+                con.emit('onErase', data);
+            }
+        });
+    });
+
+    socket.on('drawLine', (data) => {
+        connections.forEach(con => {
+            if(con.id !== socket.id){
+                con.emit('onLine', data);
+            }
+        });
+    });
+
+    socket.on('drawRect', (data) => {
+        connections.forEach(con => {
+            if(con.id !== socket.id){
+                con.emit('onRect', data);
+            }
+        });
+    });
+
     socket.on('down', (data) => {
         connections.forEach(con => {
             if(con.id !== socket.id){
