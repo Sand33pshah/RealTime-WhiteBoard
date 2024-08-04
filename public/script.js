@@ -1,146 +1,164 @@
 let canvas = document.getElementById('canvas');
+
 canvas.width = 0.98 * window.innerWidth;
 canvas.height = window.innerHeight;
 
 var io = io.connect('http://localhost:8080/');
 
 let ctx = canvas.getContext("2d");
-let x;
-let y;
+let x, y;
 let mouseDown = false;
-
-// Tool-related variables
 let startX, startY;
-let currentTool = 'pencil'; // Default tool
-const eraserSize = 20;  // Size of the eraser
+let currentTool = 'pencil'; // default tool
+const eraserSize = 20; // size of eraser
+let storedDrawings = []; // to store all actions
 
-// Retrieving and handling tool selection
+// Retrieve the tool selected
 const toolButtons = document.querySelectorAll('.tools button');
 toolButtons.forEach(button => {
     button.addEventListener('click', () => {
         currentTool = button.id;
         toolButtons.forEach(btn => btn.classList.remove('active'));
         button.classList.add('active');
+        if (currentTool === 'eraser') {
+            ctx.globalCompositeOperation = 'destination-out';
+        } else {
+            ctx.globalCompositeOperation = 'source-over';
+        }
     });
 });
 
 window.onmousedown = (e) => {
-    x = e.clientX;
-    y = e.clientY;
     const rect = canvas.getBoundingClientRect();
-    x -= rect.left;
-    y -= rect.top;
+    x = e.clientX - rect.left;
+    y = e.clientY - rect.top;
     startX = x;
     startY = y;
 
     if (currentTool === 'pencil') {
         ctx.beginPath();
         ctx.moveTo(x, y);
+        io.emit('down', { x, y });
     } else if (currentTool === 'eraser') {
-        ctx.globalCompositeOperation = 'destination-out';
         ctx.beginPath();
         ctx.arc(x, y, eraserSize, 0, Math.PI * 2); // Draw initial circle
         ctx.fill();
+        io.emit('down', { x, y, size: eraserSize });
+    } else if (currentTool === 'line' || currentTool === 'rectangle') {
+        io.emit('down', { x: startX, y: startY });
     }
 
-    io.emit('down', { x, y, tool: currentTool });
     mouseDown = true;
 };
 
 window.onmouseup = (e) => {
-    if (mouseDown) {
-        if (currentTool === 'line') {
-            io.emit('drawLine', { startX, startY, endX: x, endY: y });
-        } else if (currentTool === 'rectangle') {
-            io.emit('drawRect', { startX, startY, width: x - startX, height: y - startY });
-        }
-        mouseDown = false;
+    if (!mouseDown) return;
+
+    const rect = canvas.getBoundingClientRect();
+    x = e.clientX - rect.left;
+    y = e.clientY - rect.top;
+
+    if (currentTool === 'line') {
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        io.emit('drawLine', { startX, startY, endX: x, endY: y });
+    } else if (currentTool === 'rectangle') {
+        ctx.beginPath();
+        ctx.rect(startX, startY, x - startX, y - startY);
+        ctx.stroke();
+        io.emit('drawRect', { startX, startY, width: x - startX, height: y - startY });
     }
+
+    mouseDown = false;
 };
 
 window.onmousemove = (e) => {
-    x = e.clientX;
-    y = e.clientY;
+    if (!mouseDown) return;
+
     const rect = canvas.getBoundingClientRect();
-    x -= rect.left;
-    y -= rect.top;
+    x = e.clientX - rect.left;
+    y = e.clientY - rect.top;
 
-    if (mouseDown) {
-        if (currentTool === 'pencil') {
-            io.emit('draw', { x, y });
-            ctx.lineTo(x, y);
-            ctx.stroke();
-        } else if (currentTool === 'eraser') {
-            io.emit('erase', { x, y, size: eraserSize });
-            ctx.globalCompositeOperation = 'destination-out';
-            ctx.beginPath();
-            ctx.arc(x, y, eraserSize, 0, Math.PI * 2); // Draw a large circle for erasing
-            ctx.fill();
-        } else if (currentTool === 'line') {
-            // Use a buffer canvas to draw intermediate line
-            const bufferCanvas = document.createElement('canvas');
-            bufferCanvas.width = canvas.width;
-            bufferCanvas.height = canvas.height;
-            const bufferCtx = bufferCanvas.getContext('2d');
-
-            bufferCtx.beginPath();
-            bufferCtx.moveTo(startX, startY);
-            bufferCtx.lineTo(x, y);
-            bufferCtx.stroke();
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(bufferCanvas, 0, 0);
-        } else if (currentTool === 'rectangle') {
-            // Use a buffer canvas to draw intermediate rectangle
-            const bufferCanvas = document.createElement('canvas');
-            bufferCanvas.width = canvas.width;
-            bufferCanvas.height = canvas.height;
-            const bufferCtx = bufferCanvas.getContext('2d');
-
-            bufferCtx.beginPath();
-            bufferCtx.rect(startX, startY, x - startX, y - startY);
-            bufferCtx.stroke();
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(bufferCanvas, 0, 0);
-        }
-    }
-};
-
-io.on('ondraw', ({ x, y }) => {
     if (currentTool === 'pencil') {
         ctx.lineTo(x, y);
         ctx.stroke();
+        io.emit('draw', { startX, startY, endX: x, endY: y });
+        startX = x;
+        startY = y;
+    } else if (currentTool === 'eraser') {
+        ctx.beginPath();
+        ctx.arc(x, y, eraserSize, 0, Math.PI * 2); // Draw a large circle for erasing
+        ctx.fill();
+        io.emit('erase', { x, y, size: eraserSize });
+    }
+};
+
+io.on('initDrawing', (actions) => {
+    storedDrawings = actions;
+    redrawCanvas();
+});
+
+io.on('ondraw', (data) => {
+    storedDrawings.push({ tool: 'pencil', startX: data.startX, startY: data.startY, endX: data.endX, endY: data.endY });
+    drawAction({ tool: 'pencil', startX: data.startX, startY: data.startY, endX: data.endX, endY: data.endY });
+});
+
+io.on('onErase', (data) => {
+    storedDrawings.push({ tool: 'eraser', x: data.x, y: data.y, size: data.size });
+    drawAction({ tool: 'eraser', x: data.x, y: data.y, size: data.size });
+});
+
+io.on('onLine', (data) => {
+    storedDrawings.push({ tool: 'line', startX: data.startX, startY: data.startY, endX: data.endX, endY: data.endY });
+    drawAction({ tool: 'line', startX: data.startX, startY: data.startY, endX: data.endX, endY: data.endY });
+});
+
+io.on('onRect', (data) => {
+    storedDrawings.push({ tool: 'rectangle', startX: data.startX, startY: data.startY, width: data.width, height: data.height });
+    drawAction({ tool: 'rectangle', startX: data.startX, startY: data.startY, width: data.width, height: data.height });
+});
+
+io.on('ondown', (data) => {
+    if (currentTool === 'pencil' || currentTool === 'eraser') {
+        ctx.moveTo(data.x, data.y);
     }
 });
 
-io.on('onErase', ({ x, y, size }) => {
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.beginPath();
-    ctx.arc(x, y, size, 0, Math.PI * 2); // Draw a large circle for erasing
-    ctx.fill();
-});
-
-io.on('onLine', ({ startX, startY, endX, endY }) => {
-    ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    ctx.lineTo(endX, endY);
-    ctx.stroke();
-});
-
-io.on('onRect', ({ startX, startY, width, height }) => {
-    ctx.beginPath();
-    ctx.rect(startX, startY, width, height);
-    ctx.stroke();
-});
-
-io.on('ondown', ({ x, y }) => {
-    ctx.moveTo(x, y);
-});
+function drawAction(action) {
+    if (action.tool === 'pencil') {
+        ctx.beginPath();
+        ctx.moveTo(action.startX, action.startY);
+        ctx.lineTo(action.endX, action.endY);
+        ctx.stroke();
+    } else if (action.tool === 'line') {
+        ctx.beginPath();
+        ctx.moveTo(action.startX, action.startY);
+        ctx.lineTo(action.endX, action.endY);
+        ctx.stroke();
+    } else if (action.tool === 'rectangle') {
+        ctx.beginPath();
+        ctx.rect(action.startX, action.startY, action.width, action.height);
+        ctx.stroke();
+    } else if (action.tool === 'eraser') {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.beginPath();
+        ctx.arc(action.x, action.y, action.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+    }
+}
 
 function resizeCanvas() {
     canvas.width = canvas.parentElement.clientWidth;
     canvas.height = canvas.parentElement.clientHeight;
+    redrawCanvas();
+}
+
+function redrawCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    storedDrawings.forEach(drawAction);
 }
 
 // Initial resize
